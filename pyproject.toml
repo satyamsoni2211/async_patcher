@@ -1,0 +1,17 @@
+[project]
+name = "async-patcher"
+version = "0.1.0"
+description = "Patches asyncio to add to_process — run callables in a separate process, get back an awaitable ProcessTask"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
