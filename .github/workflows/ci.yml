@@ -42,13 +42,10 @@ jobs:
             --cov-report=xml \
             --cov-report=term-missing \
             -v
-
-      - name: Upload coverage to Codecov
+      
+      - name: Upload coverage reports to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          flags: unittests
-          name: async-patcher-coverage
-          fail_ci_if_error: false
+          slug: satyamsoni2211/async_patcher

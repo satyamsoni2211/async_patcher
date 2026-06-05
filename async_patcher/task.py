@@ -56,7 +56,7 @@ class ProcessTask(asyncio.Task):
         kwargs: dict,
         *,
         loop: asyncio.AbstractEventLoop,
-        executor: Any,
+        executor: ProcessPoolExecutor,
         cancel_timeout: float = 5.0,
     ) -> None:
         self.func_name: str = func.__name__
