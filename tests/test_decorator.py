@@ -1,5 +1,7 @@
 """Tests for the @run_in_process decorator."""
-import asyncio
+
+from __future__ import annotations
+
 from concurrent.futures import ProcessPoolExecutor
 
 import pytest
@@ -30,7 +32,7 @@ async def test_decorator_no_parens_dispatches_to_process():
 async def test_decorator_empty_parens_dispatches_to_process():
     @run_in_process()
     def cube(n):
-        return n ** 3
+        return n**3
 
     result = await cube(3)
     assert result == 27
@@ -74,7 +76,7 @@ async def test_decorator_passes_cancel_timeout():
 async def test_decorator_propagates_kwargs():
     @run_in_process
     def power(base, exp):
-        return base ** exp
+        return base**exp
 
     result = await power(2, exp=8)
     assert result == 256

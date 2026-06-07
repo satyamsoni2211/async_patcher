@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from .task import ProcessTask
 
 def patch() -> None: ...
-def set_default_executor(executor: Optional[ProcessPoolExecutor]) -> None: ...
-def get_default_executor() -> Optional[ProcessPoolExecutor]: ...
+def set_default_executor(executor: ProcessPoolExecutor | None) -> None: ...
+def get_default_executor() -> ProcessPoolExecutor | None: ...
 def _resolve_executor(
-    executor: Optional[ProcessPoolExecutor],
-) -> Optional[ProcessPoolExecutor]: ...
+    executor: ProcessPoolExecutor | None,
+) -> ProcessPoolExecutor | None: ...
 def _make_process_task(
     func: Callable[..., Any],
     args: tuple[Any, ...],
@@ -19,21 +19,21 @@ def _make_process_task(
     loop: asyncio.AbstractEventLoop,
     executor: Any,
     cancel_timeout: float,
-    timeout: Optional[float] = ...,
-    on_start: Optional[Callable[[ProcessTask], None]] = ...,
-    on_done: Optional[Callable[[ProcessTask], None]] = ...,
-    on_error: Optional[Callable[[ProcessTask], None]] = ...,
+    timeout: float | None = ...,
+    on_start: Callable[[ProcessTask], None] | None = ...,
+    on_done: Callable[[ProcessTask], None] | None = ...,
+    on_error: Callable[[ProcessTask], None] | None = ...,
 ) -> ProcessTask: ...
 def _module_to_process(
     func: Callable[..., Any],
     /,
     *args: Any,
-    executor: Optional[ProcessPoolExecutor] = ...,
+    executor: ProcessPoolExecutor | None = ...,
     cancel_timeout: float = ...,
-    timeout: Optional[float] = ...,
-    on_start: Optional[Callable[[ProcessTask], None]] = ...,
-    on_done: Optional[Callable[[ProcessTask], None]] = ...,
-    on_error: Optional[Callable[[ProcessTask], None]] = ...,
+    timeout: float | None = ...,
+    on_start: Callable[[ProcessTask], None] | None = ...,
+    on_done: Callable[[ProcessTask], None] | None = ...,
+    on_error: Callable[[ProcessTask], None] | None = ...,
     **kwargs: Any,
 ) -> ProcessTask: ...
 def _loop_to_process(
@@ -41,11 +41,11 @@ def _loop_to_process(
     func: Callable[..., Any],
     /,
     *args: Any,
-    executor: Optional[ProcessPoolExecutor] = ...,
+    executor: ProcessPoolExecutor | None = ...,
     cancel_timeout: float = ...,
-    timeout: Optional[float] = ...,
-    on_start: Optional[Callable[[ProcessTask], None]] = ...,
-    on_done: Optional[Callable[[ProcessTask], None]] = ...,
-    on_error: Optional[Callable[[ProcessTask], None]] = ...,
+    timeout: float | None = ...,
+    on_start: Callable[[ProcessTask], None] | None = ...,
+    on_done: Callable[[ProcessTask], None] | None = ...,
+    on_error: Callable[[ProcessTask], None] | None = ...,
     **kwargs: Any,
 ) -> ProcessTask: ...

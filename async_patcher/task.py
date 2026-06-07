@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import logging
 import multiprocessing
@@ -10,7 +11,7 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def _worker_wrapper(partial_fn: functools.partial) -> tuple[int, Any]:
 
 def _worker_wrapper_with_pid(
     partial_fn: functools.partial,
-    child_conn: "multiprocessing.connection.Connection",
+    child_conn: multiprocessing.connection.Connection,
 ) -> tuple[int, Any]:
     """Same as ``_worker_wrapper`` but also writes the worker pid to
     *child_conn* as the very first action, so the parent can learn the pid
@@ -91,22 +92,22 @@ class ProcessTask(asyncio.Task):
         loop: asyncio.AbstractEventLoop,
         executor: ProcessPoolExecutor,
         cancel_timeout: float = 5.0,
-        timeout: Optional[float] = None,
-        on_start: Optional[Callable[["ProcessTask"], None]] = None,
-        on_done: Optional[Callable[["ProcessTask"], None]] = None,
-        on_error: Optional[Callable[["ProcessTask"], None]] = None,
+        timeout: float | None = None,
+        on_start: Callable[[ProcessTask], None] | None = None,
+        on_done: Callable[[ProcessTask], None] | None = None,
+        on_error: Callable[[ProcessTask], None] | None = None,
     ) -> None:
         self.func_name: str = func.__name__
         self.args: tuple = args
         self.kwargs: dict = kwargs
-        self.pid: Optional[int] = None
+        self.pid: int | None = None
         self.start_time: float = time.monotonic()
-        self.end_time: Optional[float] = None
-        self.duration: Optional[float] = None
+        self.end_time: float | None = None
+        self.duration: float | None = None
         self.status: TaskStatus = TaskStatus.PENDING
-        self.exception: Optional[BaseException] = None
+        self.exception: BaseException | None = None
         self.cancel_timeout: float = cancel_timeout
-        self.timeout: Optional[float] = timeout
+        self.timeout: float | None = timeout
         self._on_start = on_start
         self._on_done = on_done
         self._on_error = on_error
@@ -128,9 +129,7 @@ class ProcessTask(asyncio.Task):
             return
         self._pid_watcher_installed = True
         try:
-            self._proc_loop.add_reader(
-                self._parent_conn.fileno(), self._capture_worker_pid
-            )
+            self._proc_loop.add_reader(self._parent_conn.fileno(), self._capture_worker_pid)
         except (NotImplementedError, OSError):
             # add_reader not available (e.g. Windows SelectorLoop with proactor);
             # pid will fall back to being set after the future resolves.
@@ -145,10 +144,8 @@ class ProcessTask(asyncio.Task):
         except (EOFError, ValueError, OSError):
             pass
         finally:
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 self._proc_loop.remove_reader(self._parent_conn.fileno())
-            except (OSError, ValueError):
-                pass
 
     def _drain_pipe(self) -> None:
         """Best-effort: read any pending bytes from the pipe (non-blocking)
@@ -157,17 +154,13 @@ class ProcessTask(asyncio.Task):
             while self._parent_conn.poll(0):
                 data = self._parent_conn.recv_bytes()
                 if self.pid is None:
-                    try:
+                    with contextlib.suppress(ValueError):
                         self.pid = int(data)
-                    except ValueError:
-                        pass
         except (EOFError, OSError):
             pass
         if self._pid_watcher_installed:
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 self._proc_loop.remove_reader(self._parent_conn.fileno())
-            except (OSError, ValueError):
-                pass
             self._pid_watcher_installed = False
 
     async def _run(self, partial_fn: functools.partial) -> Any:
@@ -197,9 +190,7 @@ class ProcessTask(asyncio.Task):
             self.end_time = time.monotonic()
             self.duration = self.end_time - self.start_time
 
-    def _fire_callback(
-        self, callback: Optional[Callable[["ProcessTask"], None]]
-    ) -> None:
+    def _fire_callback(self, callback: Callable[[ProcessTask], None] | None) -> None:
         """Call *callback* (if set) with self. Exceptions raised by the
         callback are logged but do not propagate."""
         if callback is None:
@@ -257,13 +248,9 @@ class ProcessTask(asyncio.Task):
         except ProcessLookupError:
             return
         except Exception:
-            logger.warning(
-                "async_patcher: could not SIGTERM pid %s", self.pid, exc_info=True
-            )
+            logger.warning("async_patcher: could not SIGTERM pid %s", self.pid, exc_info=True)
             return
-        self._proc_loop.call_later(
-            self.cancel_timeout, self._sigkill_if_alive, self.pid
-        )
+        self._proc_loop.call_later(self.cancel_timeout, self._sigkill_if_alive, self.pid)
 
     def cancel(self, msg: Any = None) -> bool:
         """Cancel the task.
@@ -295,14 +282,10 @@ class ProcessTask(asyncio.Task):
                 # Process already exited — nothing to do
                 pass
             except Exception:
-                logger.warning(
-                    "async_patcher: could not SIGTERM pid %s", self.pid, exc_info=True
-                )
+                logger.warning("async_patcher: could not SIGTERM pid %s", self.pid, exc_info=True)
             else:
                 # Schedule SIGKILL after cancel_timeout seconds
-                self._proc_loop.call_later(
-                    self.cancel_timeout, self._sigkill_if_alive, self.pid
-                )
+                self._proc_loop.call_later(self.cancel_timeout, self._sigkill_if_alive, self.pid)
         result = super().cancel(msg)
         if result and self.status == TaskStatus.PENDING:
             self.status = TaskStatus.CANCELLED
@@ -317,9 +300,7 @@ class ProcessTask(asyncio.Task):
         except ProcessLookupError:
             pass  # already gone — normal case
         except Exception:
-            logger.warning(
-                "async_patcher: could not SIGKILL pid %s", pid, exc_info=True
-            )
+            logger.warning("async_patcher: could not SIGKILL pid %s", pid, exc_info=True)
 
     def __repr__(self) -> str:
         duration = f"{self.duration:.4f}s" if self.duration is not None else "n/a"

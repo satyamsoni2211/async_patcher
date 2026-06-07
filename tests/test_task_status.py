@@ -1,5 +1,11 @@
 """Tests for the TaskStatus enum."""
+
+from __future__ import annotations
+
+import asyncio
 from enum import Enum
+
+import pytest
 
 from async_patcher.task import ProcessTask, TaskStatus
 
@@ -30,10 +36,6 @@ def test_task_status_equality_with_bare_string():
     assert TaskStatus.CANCELLED == "cancelled"
 
 
-import asyncio
-import pytest
-
-
 def double(x):
     return x * 2
 
@@ -44,7 +46,7 @@ async def test_process_task_status_is_taskstatus_instance():
     task = ProcessTask(double, (4,), {}, loop=loop, executor=None, cancel_timeout=5.0)
     assert isinstance(task.status, TaskStatus)
     assert task.status is TaskStatus.PENDING
-    result = await task
+    _ = await task
     assert task.status is TaskStatus.DONE
     assert task.status == "done"  # str-mixin equality
 
@@ -66,6 +68,7 @@ async def test_process_task_failed_status_is_taskstatus():
 async def test_process_task_cancelled_status_is_taskstatus():
     def slow():
         import time
+
         time.sleep(10)
 
     loop = asyncio.get_event_loop()

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import asyncio
+
 import pytest
 
 
@@ -10,6 +13,7 @@ def test_patch_adds_to_process_to_asyncio_module():
         delattr(asyncio.BaseEventLoop, "to_process")
 
     import async_patcher.patch as patch_module
+
     patch_module._patched = False
 
     from async_patcher.patch import patch
@@ -54,6 +58,7 @@ async def test_asyncio_to_process_end_to_end():
     task = asyncio.to_process(add_numbers, 3, 4)
 
     from async_patcher import ProcessTask
+
     assert isinstance(task, ProcessTask)
 
     result = await task
@@ -71,6 +76,7 @@ async def test_loop_to_process_end_to_end():
     task = loop.to_process(add_numbers, 10, 20)
 
     from async_patcher import ProcessTask
+
     assert isinstance(task, ProcessTask)
 
     result = await task

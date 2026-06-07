@@ -1,4 +1,7 @@
 """Tests for the package __version__ export."""
+
+from __future__ import annotations
+
 import re
 
 import async_patcher

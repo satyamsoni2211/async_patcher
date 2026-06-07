@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import asyncio
-import os
-import pytest
-from async_patcher.task import _worker_wrapper, ProcessTask
 import functools
+import signal
+from unittest.mock import patch as mock_patch
+
+import pytest
+
+from async_patcher.task import ProcessTask, _worker_wrapper
 
 
 def test_worker_wrapper_returns_pid_and_result():
@@ -109,6 +114,7 @@ def uses_unpicklable(obj):
 @pytest.mark.asyncio
 async def test_process_task_pickling_error_sets_failed():
     from concurrent.futures import ProcessPoolExecutor
+
     loop = asyncio.get_event_loop()
     executor = ProcessPoolExecutor(max_workers=1)
     try:
@@ -128,10 +134,6 @@ async def test_process_task_pickling_error_sets_failed():
         executor.shutdown(wait=True)
 
 
-import signal
-from unittest.mock import patch as mock_patch
-
-
 @pytest.mark.asyncio
 async def test_cancel_with_known_pid_sends_sigterm():
     """cancel() sends SIGTERM when pid is known; task raises CancelledError."""
@@ -139,6 +141,7 @@ async def test_cancel_with_known_pid_sends_sigterm():
 
     def slow():
         import time
+
         time.sleep(10)
 
     task = ProcessTask(slow, (), {}, loop=loop, executor=None, cancel_timeout=0.1)
@@ -166,6 +169,7 @@ async def test_cancel_without_pid_falls_back_to_super():
 
     def slow():
         import time
+
         time.sleep(10)
 
     task = ProcessTask(slow, (), {}, loop=loop, executor=None, cancel_timeout=5.0)

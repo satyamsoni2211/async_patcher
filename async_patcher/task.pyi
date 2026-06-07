@@ -4,7 +4,7 @@ import asyncio
 import functools
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -23,14 +23,14 @@ class ProcessTask(asyncio.Task[Any]):
     func_name: str
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
-    pid: Optional[int]
+    pid: int | None
     start_time: float
-    end_time: Optional[float]
-    duration: Optional[float]
+    end_time: float | None
+    duration: float | None
     status: TaskStatus
     exception: BaseException  # type: ignore[assignment]
     cancel_timeout: float
-    timeout: Optional[float]
+    timeout: float | None
     def __init__(
         self,
         func: Callable[..., Any],
@@ -40,10 +40,10 @@ class ProcessTask(asyncio.Task[Any]):
         loop: asyncio.AbstractEventLoop,
         executor: ProcessPoolExecutor,
         cancel_timeout: float = ...,
-        timeout: Optional[float] = ...,
-        on_start: Optional[Callable[[ProcessTask], None]] = ...,
-        on_done: Optional[Callable[[ProcessTask], None]] = ...,
-        on_error: Optional[Callable[[ProcessTask], None]] = ...,
+        timeout: float | None = ...,
+        on_start: Callable[[ProcessTask], None] | None = ...,
+        on_done: Callable[[ProcessTask], None] | None = ...,
+        on_error: Callable[[ProcessTask], None] | None = ...,
     ) -> None: ...
     def cancel(self, msg: Any = ...) -> bool: ...
     def __repr__(self) -> str: ...

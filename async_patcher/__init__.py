@@ -1,10 +1,10 @@
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
-from .task import ProcessTask, TaskStatus
 from . import patch as _patch_module
 from .decorators import run_in_process
 from .patch import get_default_executor, set_default_executor
 from .pool import process_pool
+from .task import ProcessTask, TaskStatus
 
 try:
     __version__ = _pkg_version("async-patcher")

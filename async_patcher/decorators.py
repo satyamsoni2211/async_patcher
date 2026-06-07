@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import functools
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 
 def run_in_process(
-    func: Optional[Callable] = None,
+    func: Callable | None = None,
     *,
-    executor: Optional[ProcessPoolExecutor] = None,
+    executor: ProcessPoolExecutor | None = None,
     cancel_timeout: float = 5.0,
-) -> Union[Callable, Callable[[Callable], Callable]]:
+) -> Callable | Callable[[Callable], Callable]:
     """Decorator: run the wrapped function in a separate process on every call.
 
     Usable with or without arguments::

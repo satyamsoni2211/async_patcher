@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from .task import ProcessTask
 
 _patched = False
-_default_executor: Optional[ProcessPoolExecutor] = None
+_default_executor: ProcessPoolExecutor | None = None
 
 
-def set_default_executor(executor: Optional[ProcessPoolExecutor]) -> None:
+def set_default_executor(executor: ProcessPoolExecutor | None) -> None:
     """Set the module-level default executor used by ``to_process()`` when
     no executor is explicitly provided.
 
@@ -20,14 +20,14 @@ def set_default_executor(executor: Optional[ProcessPoolExecutor]) -> None:
     _default_executor = executor
 
 
-def get_default_executor() -> Optional[ProcessPoolExecutor]:
+def get_default_executor() -> ProcessPoolExecutor | None:
     """Return the module-level default executor, or ``None`` if not set."""
     return _default_executor
 
 
 def _resolve_executor(
-    executor: Optional[ProcessPoolExecutor],
-) -> Optional[ProcessPoolExecutor]:
+    executor: ProcessPoolExecutor | None,
+) -> ProcessPoolExecutor | None:
     """Pick the executor: explicit arg > module default > None."""
     if executor is not None:
         return executor
@@ -41,10 +41,10 @@ def _make_process_task(
     loop: asyncio.AbstractEventLoop,
     executor: Any,
     cancel_timeout: float,
-    timeout: Optional[float] = None,
-    on_start: Optional[Callable[[ProcessTask], None]] = None,
-    on_done: Optional[Callable[[ProcessTask], None]] = None,
-    on_error: Optional[Callable[[ProcessTask], None]] = None,
+    timeout: float | None = None,
+    on_start: Callable[[ProcessTask], None] | None = None,
+    on_done: Callable[[ProcessTask], None] | None = None,
+    on_error: Callable[[ProcessTask], None] | None = None,
 ) -> ProcessTask:
     """Internal factory — constructs and schedules a ProcessTask."""
     return ProcessTask(
@@ -67,10 +67,10 @@ def _module_to_process(
     *args: Any,
     executor: Any = None,
     cancel_timeout: float = 5.0,
-    timeout: Optional[float] = None,
-    on_start: Optional[Callable[[ProcessTask], None]] = None,
-    on_done: Optional[Callable[[ProcessTask], None]] = None,
-    on_error: Optional[Callable[[ProcessTask], None]] = None,
+    timeout: float | None = None,
+    on_start: Callable[[ProcessTask], None] | None = None,
+    on_done: Callable[[ProcessTask], None] | None = None,
+    on_error: Callable[[ProcessTask], None] | None = None,
     **kwargs: Any,
 ) -> ProcessTask:
     """asyncio.to_process — module-level entry point."""
@@ -102,10 +102,10 @@ def _loop_to_process(
     *args: Any,
     executor: Any = None,
     cancel_timeout: float = 5.0,
-    timeout: Optional[float] = None,
-    on_start: Optional[Callable[[ProcessTask], None]] = None,
-    on_done: Optional[Callable[[ProcessTask], None]] = None,
-    on_error: Optional[Callable[[ProcessTask], None]] = None,
+    timeout: float | None = None,
+    on_start: Callable[[ProcessTask], None] | None = None,
+    on_done: Callable[[ProcessTask], None] | None = None,
+    on_error: Callable[[ProcessTask], None] | None = None,
     **kwargs: Any,
 ) -> ProcessTask:
     """loop.to_process — bound-method entry point."""

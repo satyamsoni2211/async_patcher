@@ -1,5 +1,9 @@
 """Tests that cancel() fails loudly on Windows instead of silently no-oping."""
+
+from __future__ import annotations
+
 import asyncio
+
 import pytest
 
 from async_patcher.task import ProcessTask

@@ -1,4 +1,7 @@
 """Tests for the __repr__ of ProcessTask."""
+
+from __future__ import annotations
+
 import asyncio
 import re
 

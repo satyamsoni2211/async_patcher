@@ -1,4 +1,7 @@
 """Tests for module-level default executor management."""
+
+from __future__ import annotations
+
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
 

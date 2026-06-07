@@ -1,9 +1,10 @@
 """Tests for on_start, on_done, on_error callbacks on to_process()."""
+
+from __future__ import annotations
+
 import asyncio
 
 import pytest
-
-import async_patcher
 
 
 def _double(x):
@@ -77,9 +78,7 @@ async def test_all_callbacks_called_in_order_on_success():
     def on_error(task):
         order.append("error")
 
-    task = asyncio.to_process(
-        _double, 3, on_start=on_start, on_done=on_done, on_error=on_error
-    )
+    task = asyncio.to_process(_double, 3, on_start=on_start, on_done=on_done, on_error=on_error)
     await task
     assert order == ["start", "done"]
 
@@ -99,9 +98,7 @@ async def test_all_callbacks_called_in_order_on_failure():
     def on_error(task):
         order.append("error")
 
-    task = asyncio.to_process(
-        _boom, on_start=on_start, on_done=on_done, on_error=on_error
-    )
+    task = asyncio.to_process(_boom, on_start=on_start, on_done=on_done, on_error=on_error)
     with pytest.raises(ValueError):
         await task
     assert order == ["start", "error"]

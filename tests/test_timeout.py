@@ -1,6 +1,8 @@
 """Tests for the timeout parameter on to_process()."""
+
+from __future__ import annotations
+
 import asyncio
-import os
 import signal
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -8,7 +10,7 @@ from unittest.mock import patch as mock_patch
 
 import pytest
 
-import async_patcher
+from async_patcher.pool import process_pool
 
 
 def fast_double(x):
@@ -42,14 +44,11 @@ async def test_to_process_no_timeout_default_is_none():
 async def test_to_process_timeout_fires_and_raises_timeout_error():
     import async_patcher.patch  # noqa: F401
 
-    ex = ProcessPoolExecutor(max_workers=1)
-    async_patcher.set_default_executor(ex)
-    try:
+    async with process_pool(1) as _:
         task = asyncio.to_process(slow_fn, timeout=0.3)
         with pytest.raises(asyncio.TimeoutError):
             await task
-    finally:
-        ex.shutdown(wait=True, cancel_futures=True)
+
 
 
 @pytest.mark.asyncio
@@ -69,7 +68,8 @@ async def test_to_process_timeout_kills_worker():
                 pass
             # If the worker was running, os.kill would have been called with SIGTERM
             sigterm_calls = [
-                call for call in mock_kill.call_args_list
+                call
+                for call in mock_kill.call_args_list
                 if len(call.args) >= 2 and call.args[1] == signal.SIGTERM
             ]
             assert len(sigterm_calls) >= 1

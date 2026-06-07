@@ -1,4 +1,7 @@
 """Tests for the process_pool() context manager."""
+
+from __future__ import annotations
+
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
 
@@ -62,4 +65,3 @@ async def test_process_pool_restores_previous_default_on_exit():
         assert async_patcher.get_default_executor() is previous
     finally:
         previous.shutdown(wait=True)
-
