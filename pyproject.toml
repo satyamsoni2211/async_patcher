@@ -1,28 +1,78 @@
 [project]
 name = "async-patcher"
 version = "0.1.0"
-description = "Patches asyncio to add to_process — run callables in a separate process, get back an awaitable ProcessTask"
+description = "Patches asyncio to add to_process — offload CPU-bound callables to a separate process, get back an awaitable ProcessTask with full metadata"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.9"
 dependencies = []
 
+authors = [
+  { name = "Satyam Soni", email = "satyamsoni@hotmail.co.uk" },
+]
+
+keywords = [
+  "asyncio",
+  "multiprocessing",
+  "concurrency",
+  "async",
+  "process-pool",
+  "task",
+  "cpu-bound",
+  "offload",
+  "parallel",
+  "executor",
+]
+
+classifiers = [
+  # Maturity
+  "Development Status :: 4 - Beta",
+
+  # Audience
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Distributed Computing",
+
+  # License
+  "License :: OSI Approved :: MIT License",
+
+  # Python versions
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3 :: Only",
+
+  # Typing
+  "Typing :: Typed",
+
+  # OS
+  "Operating System :: OS Independent",
+
+  # Framework
+  "Framework :: AsyncIO",
+]
+
+[project.urls]
+Homepage       = "https://github.com/satyamsoni2211/async_patcher"
+Repository     = "https://github.com/satyamsoni2211/async_patcher"
+Issues         = "https://github.com/satyamsoni2211/async_patcher/issues"
+Changelog      = "https://github.com/satyamsoni2211/async_patcher/blob/master/CHANGELOG.md"
+Documentation  = "https://github.com/satyamsoni2211/async_patcher#readme"
+
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0"]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "mypy>=1.10",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
-[tool.mypy]
-files = ["async_patcher"]
-show_error_codes = true
-strict = true
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[dependency-groups]
-dev = [
-    "mypy>=1.19.1",
-    "ruff>=0.15.16",
-]

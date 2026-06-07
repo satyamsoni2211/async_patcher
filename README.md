@@ -1,14 +1,14 @@
 # async-patcher
 
-[![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/satyamsoni2211/async_patcher/actions/workflows/ci.yml/badge.svg)](https://github.com/satyamsoni2211/async_patcher/actions/workflows/ci.yml)
-[![Codecov](https://img.shields.io/codecov/c/github/satyamsoni2211/async_patcher)
-](https://codecov.io/gh/satyamsoni2211/async_patcher)
+[![Codecov](https://img.shields.io/codecov/c/github/satyamsoni2211/async_patcher)](https://codecov.io/gh/satyamsoni2211/async_patcher)
+[![PyPI version](https://img.shields.io/pypi/v/async-patcher)](https://pypi.org/project/async-patcher/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/async-patcher)](https://pypi.org/project/async-patcher/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/async-patcher)](https://pypi.org/project/async-patcher/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/async_patcher)
-](pypi.org/project/async-patcher/)
+[![Typed](https://img.shields.io/badge/typing-py.typed%20%2F%20stubs-informational.svg)](#typed-stubs--pytyped)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)](#installation)
-[![Typed](https://img.shields.io/badge/typing-py.typed%20%2B%20stubs-informational.svg)](#typed-stubs--py.typed)
 
 > Seamlessly offload CPU-bound work from your asyncio event loop to separate processes — with full tracking, rich metadata, graceful cancellation, lifecycle callbacks, and first-class type support.
 
