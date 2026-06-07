@@ -50,7 +50,6 @@ async def test_to_process_timeout_fires_and_raises_timeout_error():
             await task
 
 
-
 @pytest.mark.asyncio
 async def test_to_process_timeout_kills_worker():
     """On timeout the worker process is sent SIGTERM (and SIGKILL after)."""
