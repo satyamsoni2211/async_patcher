@@ -1,6 +1,7 @@
 """Type-checking smoke tests for the .pyi stubs."""
-import os
-import tempfile
+import pathlib
+import subprocess
+import sys
 
 import async_patcher
 
@@ -36,18 +37,23 @@ main()
     f = tmp_path / "consumer.py"
     f.write_text(code)
 
-    import subprocess
+    # Resolve project root from this test file's location so the test works
+    # in any environment (local dev, CI, container) — not just one machine.
+    project_root = pathlib.Path(__file__).resolve().parent.parent
+
+    # Use the Python interpreter that pytest itself is running under; that
+    # interpreter already has mypy installed via the dev dependencies.
     result = subprocess.run(
         [
-            "uv",
-            "run",
+            sys.executable,
+            "-m",
             "mypy",
             "--strict",
             str(f),
         ],
         capture_output=True,
         text=True,
-        cwd="/Users/satyam_soni1/Documents/async_patcher",
+        cwd=str(project_root),
     )
     assert result.returncode == 0, (
         f"mypy failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
