@@ -1,12 +1,16 @@
 # async-patcher
 
-[![Python Version](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13%20|%203.14-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/satyamsoni2211/async_patcher/actions/workflows/ci.yml/badge.svg)](https://github.com/satyamsoni2211/async_patcher/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/satyamsoni2211/async_patcher/branch/main/graph/badge.svg)](https://codecov.io/gh/satyamsoni2211/async_patcher)
+[![Codecov](https://img.shields.io/codecov/c/github/satyamsoni2211/async_patcher)
+](https://codecov.io/gh/satyamsoni2211/async_patcher)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/async_patcher)
+](pypi.org/project/async-patcher/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)](#installation)
+[![Typed](https://img.shields.io/badge/typing-py.typed%20%2B%20stubs-informational.svg)](#typed-stubs--py.typed)
 
-> Seamlessly offload CPU-bound work from your asyncio event loop to separate processes — with full tracking, rich metadata, and graceful cancellation.
+> Seamlessly offload CPU-bound work from your asyncio event loop to separate processes — with full tracking, rich metadata, graceful cancellation, lifecycle callbacks, and first-class type support.
 
 `async-patcher` monkey-patches the `asyncio` module on import to add a `to_process` method available both at the module level (`asyncio.to_process(...)`) and on any running event loop (`loop.to_process(...)`). It returns a `ProcessTask` — a proper `asyncio.Task` subclass that is awaitable, cancellable, and carries detailed execution metadata including the worker PID, timing, status, and any exceptions raised.
 
@@ -24,7 +28,12 @@
   - [Using with the Event Loop](#using-with-the-event-loop)
   - [Passing Keyword Arguments](#passing-keyword-arguments)
   - [Custom Executor](#custom-executor)
+  - [Default Executor](#default-executor)
+  - [Process Pool Context Manager](#process-pool-context-manager)
+  - [Run-in-Process Decorator](#run-in-process-decorator)
+  - [Timeout Support](#timeout-support)
   - [Custom Cancellation Timeout](#custom-cancellation-timeout)
+  - [Lifecycle Callbacks](#lifecycle-callbacks)
   - [Tracking with ProcessTask](#tracking-with-processtask)
   - [Handling Failures](#handling-failures)
   - [Cancellation](#cancellation)
@@ -32,6 +41,11 @@
   - [asyncio.to_process](#asyncioto_process)
   - [loop.to_process](#loopto_process)
   - [ProcessTask](#processtask)
+  - [TaskStatus](#taskstatus)
+  - [set_default_executor / get_default_executor](#set_default_executor--get_default_executor)
+  - [process_pool](#process_pool)
+  - [run_in_process](#run_in_process)
+- [Typed Stubs & py.typed](#typed-stubs--pytyped)
 - [How It Works](#how-it-works)
 - [Caveats & Limitations](#caveats--limitations)
 - [Running Tests](#running-tests)
@@ -50,7 +64,7 @@ The standard fix is `loop.run_in_executor(executor, fn, *args)`, but this has fr
 - No built-in metadata: you don't know which function ran, what PID handled it, how long it took, or why it failed
 - Cancellation is partial: the `Future` is cancelled but the worker process keeps running, consuming CPU
 
-`async-patcher` solves all three:
+`async-patcher` solves all three — and goes further:
 
 ```python
 import async_patcher  # one import — asyncio is patched
@@ -59,6 +73,7 @@ task = asyncio.to_process(crunch_numbers, dataset)
 result = await task
 
 print(f"Done in {task.duration:.2f}s on PID {task.pid}")
+print(repr(task))  # <ProcessTask func='crunch_numbers' status='done' pid=84312 duration=0.0231s>
 ```
 
 ---
@@ -70,16 +85,23 @@ print(f"Done in {task.duration:.2f}s on PID {task.pid}")
 - **Rich `ProcessTask` object** — full metadata: PID, function name, args/kwargs, timing, status, exception
 - **Proper `asyncio.Task` subclass** — awaitable, cancellable, compatible with `asyncio.gather`, `asyncio.wait`, `asyncio.shield`
 - **Graceful cancellation** — SIGTERM first, then SIGKILL after a configurable timeout
+- **`TaskStatus` enum** — typed, string-comparable status values (`PENDING`, `RUNNING`, `DONE`, `FAILED`, `CANCELLED`)
+- **`@run_in_process` decorator** — decorate any function to automatically dispatch it to a worker process
+- **`timeout` parameter** — cancel and SIGTERM the worker if it exceeds a wall-clock limit
+- **`process_pool()` context manager** — `async with process_pool(max_workers=4)` for scoped pool lifecycle
+- **Default executor** — set a module-level default pool once; every call uses it without repetition
+- **Lifecycle callbacks** — `on_start`, `on_done`, `on_error` hooks for observability and logging
+- **Rich `__repr__`** — `<ProcessTask func='...' status='...' pid=... duration=...s>`
 - **kwargs support** — pass keyword arguments naturally; `functools.partial` handles the rest
-- **Custom executor support** — bring your own `ProcessPoolExecutor` for fine-grained control
 - **Idempotent patching** — importing `async_patcher` multiple times is safe
-- **Zero runtime dependencies** — pure Python 3.11+ stdlib
+- **Full type support** — `py.typed` marker, `.pyi` stubs, passes `mypy --strict`
+- **Python 3.9+** — works on 3.9 through 3.14; zero runtime dependencies
 
 ---
 
 ## Requirements
 
-- Python **3.11** or newer
+- Python **3.9** or newer
 - No third-party runtime dependencies
 
 ---
@@ -125,9 +147,10 @@ async def main():
     result = await task
 
     print(f"Result : {result}")
-    print(f"Status : {task.status}")       # "done"
+    print(f"Status : {task.status}")       # TaskStatus.DONE  (also == "done")
     print(f"PID    : {task.pid}")          # e.g. 84312
     print(f"Took   : {task.duration:.3f}s")
+    print(repr(task))                      # <ProcessTask func='cpu_intensive' status='done' pid=84312 duration=0.023s>
 
 
 asyncio.run(main())
@@ -204,7 +227,111 @@ async def main():
     executor.shutdown(wait=True)
 ```
 
-> **Tip:** A shared, long-lived executor avoids the overhead of spawning new processes on every call. Create it once at startup and reuse it across your application.
+> **Tip:** A shared, long-lived executor avoids the overhead of spawning new processes on every call. Create it once at startup and reuse it across your application — or use [`process_pool()`](#process-pool-context-manager) to manage its lifecycle automatically.
+
+---
+
+### Default Executor
+
+Set a module-level default executor once and every subsequent `to_process` call picks it up automatically — no need to pass `executor=` everywhere:
+
+```python
+import async_patcher
+from async_patcher import set_default_executor, get_default_executor
+from concurrent.futures import ProcessPoolExecutor
+
+# At application startup
+set_default_executor(ProcessPoolExecutor(max_workers=8))
+
+async def main():
+    # All of these use the shared pool automatically
+    t1 = asyncio.to_process(job_a, data_a)
+    t2 = asyncio.to_process(job_b, data_b)
+    results = await asyncio.gather(t1, t2)
+
+    # Inspect the current default
+    pool = get_default_executor()
+```
+
+Passing `executor=` explicitly to `to_process` always wins over the module default.
+
+---
+
+### Process Pool Context Manager
+
+`process_pool()` is an async context manager that creates a `ProcessPoolExecutor`, sets it as the module default for the duration of the block, and shuts it down cleanly on exit — restoring whatever default was set before:
+
+```python
+import async_patcher
+from async_patcher import process_pool
+
+async def main():
+    async with process_pool(max_workers=4) as pool:
+        # Inside this block, all to_process calls use the 4-worker pool
+        t1 = asyncio.to_process(crunch_numbers, data1)
+        t2 = asyncio.to_process(crunch_numbers, data2)
+        results = await asyncio.gather(t1, t2)
+    # Pool is shut down; previous default is restored
+```
+
+> **Note:** Only `async with` is supported — `with` (sync) is not.
+
+---
+
+### Run-in-Process Decorator
+
+Decorate a function with `@run_in_process` and calling it from a coroutine automatically dispatches it to a worker process:
+
+```python
+from async_patcher import run_in_process
+
+@run_in_process
+def crunch_numbers(n: int) -> int:
+    return sum(i * i for i in range(n))
+
+async def main():
+    result = await crunch_numbers(10_000_000)
+```
+
+Pass options via the parameterized form:
+
+```python
+from concurrent.futures import ProcessPoolExecutor
+from async_patcher import run_in_process
+
+pool = ProcessPoolExecutor(max_workers=4)
+
+@run_in_process(executor=pool, cancel_timeout=2.0)
+def render_frame(frame_id: int) -> bytes:
+    ...
+
+async def main():
+    frame = await render_frame(42)
+```
+
+Both the bare (`@run_in_process`) and parameterized (`@run_in_process(...)`) forms are supported. `functools.wraps` preserves the original function's `__name__` and `__doc__`.
+
+---
+
+### Timeout Support
+
+Pass `timeout=` to automatically cancel and clean up the worker if it exceeds a wall-clock limit:
+
+```python
+async def main():
+    try:
+        result = await asyncio.to_process(slow_job, data, timeout=10.0)
+    except TimeoutError:
+        print("Worker took too long — cancelled and killed")
+```
+
+On timeout:
+1. `TimeoutError` is raised to the awaiter
+2. `SIGTERM` is sent to the worker process
+3. After `cancel_timeout` seconds, `SIGKILL` is sent if the process is still alive
+4. `task.status` becomes `"failed"`
+
+`timeout=None` (the default) means no limit.
 
 ---
 
@@ -222,6 +349,41 @@ task = asyncio.to_process(stateless_fn, data, cancel_timeout=0.0)
 
 ---
 
+### Lifecycle Callbacks
+
+Attach callbacks to a task to react to status transitions — useful for logging, metrics, alerting, or updating a progress UI:
+
+```python
+from async_patcher import ProcessTask
+
+def on_start(task: ProcessTask) -> None:
+    print(f"[START] {task.func_name} pid={task.pid}")
+
+def on_done(task: ProcessTask) -> None:
+    print(f"[DONE]  {task.func_name} took {task.duration:.3f}s")
+
+def on_error(task: ProcessTask) -> None:
+    print(f"[ERROR] {task.func_name} failed: {task.exception}")
+
+async def main():
+    task = asyncio.to_process(
+        process_batch,
+        records,
+        on_start=on_start,
+        on_done=on_done,
+        on_error=on_error,
+    )
+    result = await task
+```
+
+**Callback guarantees:**
+- `on_start` fires after `status` transitions to `RUNNING` — `task.pid` is populated
+- `on_done` fires after `duration` and `end_time` are set
+- `on_error` fires for both worker exceptions and timeouts
+- Callback exceptions are logged at `WARNING` level and swallowed — they never affect the awaiter or the worker's exit state
+
+---
+
 ### Tracking with ProcessTask
 
 `ProcessTask` carries the full execution story. You can inspect it at any point after the task completes:
@@ -235,11 +397,12 @@ async def main():
     except Exception:
         pass  # handled below
 
+    print(f"Repr      : {repr(task)}")     # <ProcessTask func='process_batch' status='done' pid=... duration=...s>
     print(f"Function  : {task.func_name}")
     print(f"Args      : {task.args}")
     print(f"Kwargs    : {task.kwargs}")
     print(f"PID       : {task.pid}")
-    print(f"Status    : {task.status}")       # done | failed | cancelled
+    print(f"Status    : {task.status}")       # TaskStatus.DONE (== "done")
     print(f"Started   : {task.start_time}")   # monotonic float
     print(f"Ended     : {task.end_time}")
     print(f"Duration  : {task.duration:.4f}s")
@@ -279,7 +442,7 @@ async def main():
         result = await task
     except ValueError as e:
         print(f"Task failed: {e}")
-        print(f"Status    : {task.status}")     # "failed"
+        print(f"Status    : {task.status}")     # TaskStatus.FAILED  (== "failed")
         print(f"Exception : {task.exception}")  # ValueError("x must be non-negative, got -1")
 ```
 
@@ -302,7 +465,7 @@ async def main():
     try:
         await task
     except asyncio.CancelledError:
-        print(f"Task cancelled (status={task.status})")  # "cancelled"
+        print(f"Task cancelled (status={task.status})")  # TaskStatus.CANCELLED (== "cancelled")
         print(f"Ran for {task.duration:.2f}s before cancellation")
 ```
 
@@ -314,6 +477,8 @@ async def main():
 4. `task.status` is set to `"cancelled"`, and `task.end_time` / `task.duration` are recorded
 
 If the task hasn't started yet (status is `"pending"`), only the asyncio cancellation is applied — no signals are needed.
+
+> **Windows note:** Signal escalation (`SIGTERM`/`SIGKILL`) requires Unix. On Windows, calling `cancel()` with a known PID raises `NotImplementedError`. Pure asyncio cancellation (no PID yet) works on all platforms.
 
 ---
 
@@ -328,6 +493,10 @@ asyncio.to_process(
     *args: Any,
     executor: ProcessPoolExecutor | None = None,
     cancel_timeout: float = 5.0,
+    timeout: float | None = None,
+    on_start: Callable[[ProcessTask], None] | None = None,
+    on_done: Callable[[ProcessTask], None] | None = None,
+    on_error: Callable[[ProcessTask], None] | None = None,
     **kwargs: Any,
 ) -> ProcessTask
 ```
@@ -340,8 +509,12 @@ Dispatches `func(*args, **kwargs)` to a separate process and returns an awaitabl
 |---|---|---|---|
 | `func` | `Callable` | — | The function to run in a worker process. Must be picklable (top-level or importable). |
 | `*args` | `Any` | — | Positional arguments passed to `func`. Must be picklable. |
-| `executor` | `ProcessPoolExecutor \| None` | `None` | Executor to use. If `None`, Python's default pool is used. |
+| `executor` | `ProcessPoolExecutor \| None` | `None` | Executor to use. Falls back to the module default, then Python's default pool. |
 | `cancel_timeout` | `float` | `5.0` | Seconds between SIGTERM and SIGKILL on cancellation. |
+| `timeout` | `float \| None` | `None` | Wall-clock seconds before the worker is forcibly cancelled. `None` = no limit. |
+| `on_start` | `Callable[[ProcessTask], None] \| None` | `None` | Called when the task transitions to `RUNNING`. |
+| `on_done` | `Callable[[ProcessTask], None] \| None` | `None` | Called when the task completes successfully. |
+| `on_error` | `Callable[[ProcessTask], None] \| None` | `None` | Called when the task fails or times out. |
 | `**kwargs` | `Any` | — | Keyword arguments passed to `func`. Must be picklable. |
 
 ---
@@ -355,11 +528,15 @@ loop.to_process(
     *args: Any,
     executor: ProcessPoolExecutor | None = None,
     cancel_timeout: float = 5.0,
+    timeout: float | None = None,
+    on_start: Callable[[ProcessTask], None] | None = None,
+    on_done: Callable[[ProcessTask], None] | None = None,
+    on_error: Callable[[ProcessTask], None] | None = None,
     **kwargs: Any,
 ) -> ProcessTask
 ```
 
-Identical to `asyncio.to_process` but called on a specific event loop instance. Useful when you have an explicit reference to the loop:
+Identical to `asyncio.to_process` but called on a specific event loop instance:
 
 ```python
 loop = asyncio.get_event_loop()
@@ -370,7 +547,7 @@ task = loop.to_process(fn, *args, **kwargs)
 
 ### `ProcessTask`
 
-`ProcessTask` is a subclass of `asyncio.Task`. It is returned by both `asyncio.to_process` and `loop.to_process`. You can import it for type annotations and `isinstance` checks:
+`ProcessTask` is a subclass of `asyncio.Task`. It is returned by both `asyncio.to_process` and `loop.to_process`. Import it for type annotations and `isinstance` checks:
 
 ```python
 from async_patcher import ProcessTask
@@ -387,9 +564,19 @@ from async_patcher import ProcessTask
 | `start_time` | `float` | `time.monotonic()` recorded at task construction. |
 | `end_time` | `float \| None` | `time.monotonic()` recorded on completion, failure, or cancellation. |
 | `duration` | `float \| None` | `end_time - start_time`. Set at the same time as `end_time`. |
-| `status` | `str` | One of `"pending"`, `"running"`, `"done"`, `"failed"`, `"cancelled"`. |
+| `status` | `TaskStatus` | Current lifecycle state (see [`TaskStatus`](#taskstatus)). Also comparable to bare strings. |
 | `exception` | `BaseException \| None` | The exception raised by the worker, if `status == "failed"`. |
 | `cancel_timeout` | `float` | Seconds between SIGTERM and SIGKILL on cancellation. |
+
+#### `__repr__`
+
+```python
+repr(task)
+# <ProcessTask func='crunch_numbers' status='done' pid=84312 duration=0.0231s>
+# <ProcessTask func='crunch_numbers' status='running' pid='n/a' duration='n/a'>
+```
+
+PID and duration show as `'n/a'` while the task is pending or running.
 
 #### Status lifecycle
 
@@ -406,7 +593,116 @@ pending  →  running  →  done
 
 **`cancel(msg=None) → bool`**
 
-Sends SIGTERM to the worker process (if PID is known), schedules SIGKILL after `cancel_timeout` seconds, and calls `super().cancel()`. Sets `status = "cancelled"` if the task was still pending.
+Sends SIGTERM to the worker process (if PID is known), schedules SIGKILL after `cancel_timeout` seconds, and calls `super().cancel()`. Raises `NotImplementedError` on Windows when a PID is already known.
+
+---
+
+### `TaskStatus`
+
+`TaskStatus` is a `str`-mixin enum with members for each lifecycle state. Because it inherits `str`, existing code that compares `task.status == "done"` continues to work unchanged.
+
+```python
+from async_patcher import TaskStatus
+
+print(TaskStatus.PENDING)    # TaskStatus.PENDING
+print(TaskStatus.PENDING.value)  # "pending"
+
+# String equality is preserved
+assert TaskStatus.DONE == "done"
+assert TaskStatus.FAILED == "failed"
+```
+
+| Member | Value |
+|---|---|
+| `TaskStatus.PENDING` | `"pending"` |
+| `TaskStatus.RUNNING` | `"running"` |
+| `TaskStatus.DONE` | `"done"` |
+| `TaskStatus.FAILED` | `"failed"` |
+| `TaskStatus.CANCELLED` | `"cancelled"` |
+
+---
+
+### `set_default_executor` / `get_default_executor`
+
+```python
+from async_patcher import set_default_executor, get_default_executor
+from concurrent.futures import ProcessPoolExecutor
+
+set_default_executor(ProcessPoolExecutor(max_workers=8))
+pool = get_default_executor()   # ProcessPoolExecutor | None
+```
+
+`set_default_executor(None)` clears the default and falls back to Python's built-in pool.
+
+---
+
+### `process_pool`
+
+```python
+from async_patcher import process_pool
+
+async with process_pool(max_workers: int = ...) as pool:
+    ...
+```
+
+An async context manager that:
+1. Creates a `ProcessPoolExecutor` with the given `max_workers`
+2. Sets it as the module default (via `set_default_executor`)
+3. On `__aexit__`: calls `executor.shutdown(wait=True)` and restores the previous default
+
+---
+
+### `run_in_process`
+
+```python
+from async_patcher import run_in_process
+
+# Bare decorator — uses module default executor
+@run_in_process
+def my_fn(x: int) -> int: ...
+
+# Parameterized decorator
+@run_in_process(executor=pool, cancel_timeout=2.0)
+def my_fn(x: int) -> int: ...
+```
+
+When the decorated function is called from a coroutine, it returns an awaitable `ProcessTask`. `functools.wraps` preserves `__name__` and `__doc__`.
+
+---
+
+### `__version__`
+
+```python
+import async_patcher
+print(async_patcher.__version__)  # e.g. "0.2.0"
+```
+
+Read from `importlib.metadata` at import time; falls back to `"0.1.0"` for unpacked source trees.
+
+---
+
+## Typed Stubs & py.typed
+
+`async-patcher` ships a `py.typed` marker and `.pyi` stub files for all public modules. Type checkers (`mypy`, `pyright`, `pylance`) discover them automatically — no extra configuration needed.
+
+```
+async_patcher/
+├── py.typed          # PEP 561 marker
+├── __init__.pyi
+├── task.pyi
+├── patch.pyi
+├── decorators.pyi
+└── pool.pyi
+```
+
+The package passes `mypy --strict` on all source files. To verify locally:
+
+```bash
+uv run mypy --strict async_patcher
+# Success: no issues found in 5 source files
+```
+
+> **Known limitation:** `asyncio.to_process` is added by runtime monkey-patching and is invisible to the standard `asyncio` stubs. For full call-site type coverage, import the typed `ProcessTask` return value rather than relying on `asyncio.to_process` being typed by a type checker.
 
 ---
 
@@ -423,19 +719,27 @@ ProcessTask.__init__
   └─ schedules _run() coroutine as an asyncio.Task
 
 ProcessTask._run()  (coroutine, runs on event loop)
-  ├─ sets status = "running"
-  ├─ await loop.run_in_executor(executor, _worker_wrapper, partial_fn)
+  ├─ sets status = RUNNING  →  fires on_start callback
+  ├─ opens multiprocessing.Pipe to capture worker PID eagerly
+  ├─ await loop.run_in_executor(executor, _worker_wrapper_with_pid, partial_fn, pipe)
   │                                         │
   │            ┌────────────────────────────┘
   │            ▼
-  │    _worker_wrapper(partial_fn)   ← runs in worker process
-  │      ├─ pid = os.getpid()
+  │    _worker_wrapper_with_pid(partial_fn, pipe)   ← runs in worker process
+  │      ├─ pid = os.getpid(); pipe.send(pid)       ← captured before work starts
   │      ├─ result = partial_fn()
   │      └─ return (pid, result)
   │
   ├─ unpacks (pid, result)
-  ├─ sets self.pid, status = "done"
+  ├─ sets self.pid, status = DONE, end_time, duration
+  ├─ fires on_done callback
   └─ returns result to awaiter
+
+On timeout:
+  ├─ asyncio.wait_for raises TimeoutError
+  ├─ os.kill(pid, SIGTERM)  →  SIGKILL after cancel_timeout
+  ├─ status = FAILED
+  └─ fires on_error callback
 
 On cancel():
   ├─ os.kill(pid, SIGTERM)
@@ -443,8 +747,9 @@ On cancel():
   └─ super().cancel() → CancelledError to awaiter
 
 On exception in worker:
-  ├─ status = "failed"
+  ├─ status = FAILED
   ├─ self.exception = exc
+  ├─ fires on_error callback
   └─ re-raises to awaiter
 ```
 
@@ -466,8 +771,17 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-**SIGTERM/SIGKILL only works on Unix.**
-The cancellation escalation uses `os.kill` with `SIGTERM`/`SIGKILL`, which is Unix-only. On Windows, cancellation falls back to `super().cancel()` only (the process is not explicitly killed).
+**SIGTERM/SIGKILL and `cancel()` with a PID only work on Unix.**
+On Windows, calling `cancel()` after a worker PID is known raises `NotImplementedError`. When the worker hasn't started yet (`pid is None`), pure asyncio cancellation is used and works on all platforms.
+
+**`add_reader` may not be available on all event loops.**
+The pipe-based eager PID capture uses `loop.add_reader`. On Windows with the Proactor event loop, this falls back to setting `pid` after the executor future resolves (the original behavior). Timeout cancellation in this fallback is best-effort.
+
+**`asyncio.to_process` is not typed at the call site.**
+Runtime monkey-patching is invisible to static type checkers. Assign the return value to `ProcessTask` for downstream type safety.
+
+**Sync `with` on `process_pool` is not supported.**
+Only `async with process_pool(...)` is supported.
 
 **No cross-loop task tracking.**
 `ProcessTask` instances are bound to the loop on which they were created. Do not share them across loops.
@@ -487,20 +801,34 @@ uv sync --extra dev
 # Or with pip
 pip install -e ".[dev]"
 
-# Run the test suite
+# Run the full test suite (67 tests)
 uv run pytest -v
 
 # Run a specific test file
 uv run pytest tests/test_task.py -v
-uv run pytest tests/test_patch.py -v
+uv run pytest tests/test_callbacks.py -v
+
+# Type-check the package
+uv run mypy --strict async_patcher
 ```
 
 ### Test structure
 
-| File | What it tests |
-|---|---|
-| `tests/test_task.py` | `ProcessTask` construction, metadata, lifecycle transitions, cancellation, exception capture, pickling errors |
-| `tests/test_patch.py` | Patching `asyncio` module and `BaseEventLoop`, idempotency, end-to-end `await`, kwargs, `RuntimeError` outside loop |
+| File | Tests | Focus |
+|---|---|---|
+| `tests/test_task.py` | 9 | `ProcessTask` construction, metadata, lifecycle, cancellation, exception capture, pickling |
+| `tests/test_patch.py` | 7 | Patching `asyncio` + `BaseEventLoop`, idempotency, end-to-end `await`, kwargs, `RuntimeError` outside loop |
+| `tests/test_task_status.py` | 7 | `TaskStatus` enum, str-mixin equality, status field type |
+| `tests/test_version.py` | 4 | `__version__` exists, non-empty, matches semver pattern |
+| `tests/test_windows_cancellation.py` | 3 | Windows `NotImplementedError`; no-PID path; Linux regression |
+| `tests/test_default_executor.py` | 5 | Getter/setter; fallback; explicit-arg-wins |
+| `tests/test_decorator.py` | 9 | Bare/empty/parameterized forms; metadata preservation |
+| `tests/test_timeout.py` | 4 | `timeout` accepted; default `None`; `TimeoutError` raised; SIGTERM fires |
+| `tests/test_process_pool.py` | 5 | `async with` lifecycle; default restored on exit; default used as executor |
+| `tests/test_repr.py` | 6 | `__repr__` content (func, status, pid, duration) |
+| `tests/test_callbacks.py` | 7 | `on_start`/`on_done`/`on_error` order and arguments |
+| `tests/test_stub_smoke.py` | 1 | Subprocess `mypy --strict` on consumer code |
+| **Total** | **67** | |
 
 ---
 
@@ -529,17 +857,20 @@ git checkout -b feat/your-feature-name
 
 ### 4. Make your changes
 
-- Follow the existing code style (PEP 8, type annotations, docstrings)
+- Follow the existing code style (PEP 8, type annotations)
 - Write tests for any new behaviour — the project follows **TDD**
-- Keep files focused: `task.py` owns `ProcessTask`, `patch.py` owns the monkey-patching
+- Keep files focused: `task.py` owns `ProcessTask`, `patch.py` owns monkey-patching, `decorators.py` owns `@run_in_process`, `pool.py` owns `process_pool`
+- Update `.pyi` stubs for any new public symbols
+- `from __future__ import annotations` at the top of every module
 
-### 5. Run the tests
+### 5. Run tests and type checks
 
 ```bash
 uv run pytest -v
+uv run mypy --strict async_patcher
 ```
 
-All 16 tests must pass before submitting.
+All 67 tests must pass and `mypy --strict` must report no issues before submitting.
 
 ### 6. Commit and push
 
@@ -551,17 +882,10 @@ git push origin feat/your-feature-name
 
 ### 7. Open a Pull Request
 
-Open a PR against `main` on [github.com/satyamsoni2211/async_patcher](https://github.com/satyamsoni2211/async_patcher). Include:
+Open a PR against `master` on [github.com/satyamsoni2211/async_patcher](https://github.com/satyamsoni2211/async_patcher). Include:
 - A clear description of what the change does and why
 - Any relevant issue numbers
-- Test output confirming all tests pass
-
-### Code style
-
-- Python 3.11+ syntax and type hints throughout
-- `from __future__ import annotations` at the top of every module
-- Docstrings on all public classes and methods
-- No third-party runtime dependencies — stdlib only
+- Test output confirming all tests pass and mypy is clean
 
 ### Reporting issues
 
